@@ -1,3 +1,38 @@
+// INFORMAÇÕES INICIAIS
+let arrayDeRetorno = []; // Variável que guarda arrays de retorno - onde é guardado o carrinho como array
+let elementOlCarrinho;
+
+// ****************************************************************
+// FUNÇÕES DIVERSAS DO PROJETO
+// ****************************************************************
+function createProductImageElement(imageSource) {
+  const img = document.createElement('img');
+  img.className = 'item__image';
+  img.src = imageSource;
+  return img;
+}
+
+function createCustomElement(element, className, innerText) {
+  const e = document.createElement(element);
+  e.className = className;
+  e.innerText = innerText;
+  return e;
+}
+
+function createProductItemElement({ sku, name, image }) {
+  const section = document.createElement('section');
+  section.className = 'item';
+  section.appendChild(createCustomElement('span', 'item__sku', sku));
+  section.appendChild(createCustomElement('span', 'item__title', name));
+  section.appendChild(createProductImageElement(image));
+  section.appendChild(createCustomElement('button', 'item__add', 'Adicionar ao carrinho!'));
+  return section;
+}
+
+// function getSkuFromProductItem(item) {
+//   return item.querySelector('span.item__sku').innerText;
+// }
+
 // *********************************************
 // Requisito 01 - CHAMA OS PRODUTOS PARA A TELA
 // *********************************************
@@ -28,41 +63,33 @@ const getProdutos = async () => { // requisito 01
   }
 };
 
-function createProductImageElement(imageSource) {
-  const img = document.createElement('img');
-  img.className = 'item__image';
-  img.src = imageSource;
-  return img;
+
+// ******************************************************************
+// Requisito 03 - REMOVE O ITEM DO CARRINHO DE COMPRAS AO CLICAR NELE
+// ******************************************************************
+const removeCarrinho = (itemRemover) => { // requisito 03
+  const excluir = arrayDeRetorno
+    .find((elemento) => elemento.sku === itemRemover);
+  console.log(`arrayDeRetorno: ${arrayDeRetorno}`);
+  arrayDeRetorno // Percorre o arrayDeRetorno
+    .forEach((elemento, index) => {
+      if (elemento === excluir) {
+        arrayDeRetorno.splice(index, 1); // Splice altera conteudos de uma lista
+        localStorage.removeItem(itemRemover); // Remove item do LocalStorage
+      }
+    });
+  return 
+};
+
+function cartItemClickListener(event) { // requisito 03
+  const removeItemLocalStorage = event.target.innerText.substring(5, 18);
+  console.log(`removeItemLocalStorage: ${removeItemLocalStorage}`);
+  removeCarrinho(removeItemLocalStorage); // Chama a função e remove item do carrinho
+  console.log(`event.target: ${event.target}`);
+  elementOlCarrinho.removeChild(event.target);
 }
 
-function createCustomElement(element, className, innerText) {
-  const e = document.createElement(element);
-  e.className = className;
-  e.innerText = innerText;
-  return e;
-}
-
-function createProductItemElement({ sku, name, image }) {
-  const section = document.createElement('section');
-  section.className = 'item';
-
-  section.appendChild(createCustomElement('span', 'item__sku', sku));
-  section.appendChild(createCustomElement('span', 'item__title', name));
-  section.appendChild(createProductImageElement(image));
-  section.appendChild(createCustomElement('button', 'item__add', 'Adicionar ao carrinho!'));
-
-  return section;
-}
-
-function getSkuFromProductItem(item) {
-  return item.querySelector('span.item__sku').innerText;
-}
-
-function cartItemClickListener(event) {
-  // coloque seu código aqui
-}
-
-function createCartItemElement({ sku, name, salePrice }) {
+function createCartItemElement({ sku, name, salePrice }) { // Função já vinda no Projeto
   const li = document.createElement('li');
   li.className = 'cart__item';
   li.innerText = `SKU: ${sku} | NAME: ${name} | PRICE: $${salePrice}`;
@@ -70,6 +97,81 @@ function createCartItemElement({ sku, name, salePrice }) {
   return li;
 }
 
-window.onload = () => {
-  getProdutos();
- };
+// *********************************************************
+// Requisito 02 - POSSIBILITA ADICIONAR PRODUTOS NO CARRINHO
+// *********************************************************
+const requisicaoAddItem = (evento) => {
+  const buscaClasseItem = evento.target.parentElement.querySelector('span.item__sku'); // busca a classe que tem o item dentro através do parentElement que retorna o elemento pai
+  const idItem = buscaClasseItem.innerText; // mostra o texto da classe encontrada
+  fetch(`https://api.mercadolibre.com/items/${idItem}`)
+    .then((response) => response.json())
+    .then((objeto) => {
+      const item = { sku: objeto.id, name: objeto.title, salePrice: objeto.price };
+      localStorage.setItem(objeto.id, JSON.stringify(item)); // requisito 04 - stringify transforma em string para colocar chave/valor no localstorage
+      elementOlCarrinho.appendChild(createCartItemElement(item)); // Adiciona o item
+      arrayDeRetorno.push({ sku: objeto.id, salePrice: objeto.price });
+      
+    })
+    .catch((error) => {
+      window.alert(error);
+    });
+};
+
+const addItemNoCarrinho = () => { // Identifica que está sendo clicado no 'Adicionar ao carrinh
+  const botaoAddItemNoCarrinho = document.querySelector('.items');
+  botaoAddItemNoCarrinho.addEventListener('click', (evento) => {
+    if (evento.target.className === 'item__add') {
+      requisicaoAddItem(evento);
+    }
+  });
+};
+
+// *****************************************************
+// Requisito 04 - CARREGUE O CARRINHO PELO LOCAL STORAGE
+// *****************************************************
+const pegaValoresLS = () => {
+  const valoresLocalStorage = Object.values(localStorage);
+  if (valoresLocalStorage.length > 0) {
+    valoresLocalStorage
+      .forEach((item) => {
+        const elemento = JSON.parse(item); // constroi o elemento com dados do JSON
+        elementOlCarrinho.appendChild(createCartItemElement(elemento));
+        arrayDeRetorno.push({ sku: elemento.sku, salePrice: elemento.salePrice });
+      });
+  }
+};
+
+// ***********************************************************
+// Requisito 06 - FAZER FUNCIONAR O BOTAO DE ESVAZIAR CARRINHO
+// ***********************************************************
+function esvaziaCarrinho() {
+  const botaoEsvaziarCarrinho = document.querySelector('.empty-cart');
+  botaoEsvaziarCarrinho.addEventListener('click', () => {
+    localStorage.clear(); // Esvazia o LocalStorage que contem o carrinho
+    const itensCarrinho = document.querySelectorAll('.cart__item'); // seleciona todos itens do carrinho
+    for (let index = itensCarrinho.length; index > 0; index -= 1) {
+      elementOlCarrinho.removeChild(itensCarrinho[index - 1]); // remove o item
+    }
+    arrayDeRetorno = []; // Esvazia o array que armazena internamente o carrinho
+    
+  });
+}
+
+// ****************************************************************
+// Requisito 07 - ADICIONAR TEXTO DE LOADING DURANTE REQUISIÇÃO API
+// ****************************************************************
+// Adicionado resolução dentro do requisito 01 onde automaticamente é colocado um loading dentro do index.html e é retirado na resposta do fetch da API
+// 
+
+// ****************************************************************
+// INICIAIS AO ABRIR A PÁGINA
+// ****************************************************************
+window.onload = function onload() {
+  elementOlCarrinho = document.querySelector('.cart__items'); // Seleciona a OL de lista de carrinho
+
+  getProdutos(); // requisito 01
+  addItemNoCarrinho(); // requisito 02
+  pegaValoresLS(); // requisito 04
+  somaCarrinho(); // requisito 05
+  esvaziaCarrinho(); // requisito 06
+};
